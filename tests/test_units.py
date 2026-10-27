@@ -158,7 +158,8 @@ def test_quantization_is_per_output_channel():
     weight = rng.standard_normal((6, 4)).astype(np.float32)  # [out, in]
     quantized, scale = convert._quantize(weight)
     assert quantized.shape == (4, 6) and quantized.dtype == np.int8 and scale.shape == (6,)
-    assert np.abs(quantized).max(axis=0).tolist() == [127] * 6
+    # 7 bits: no pair of u8 x s8 products can saturate MatMulInteger's 16-bit sums.
+    assert np.abs(quantized).max(axis=0).tolist() == [63] * 6
     assert np.allclose(quantized * scale, weight.T, atol=scale.max() / 2 + 1e-7)
     # A 1x1 convolution [out, in, 1] is the same matrix.
     assert np.array_equal(convert._matrix(weight[:, :, None]), weight.T)
@@ -168,7 +169,11 @@ def test_a_folder_without_its_stamp_is_not_ready(tmp_path):
     assert not convert.is_ready(tmp_path)
     (tmp_path / convert.READY_FILE).write_text('{"graph_sha256": "old"}')
     assert not convert.is_ready(tmp_path)
-    (tmp_path / convert.READY_FILE).write_text(json.dumps({'graph_sha256': convert.layout()['graph_sha256']}))
+    current = convert.layout()['graph_sha256']
+    (tmp_path / convert.READY_FILE).write_text(json.dumps({'graph_sha256': current}))
+    assert not convert.is_ready(tmp_path), 'a folder from the first converter is rebuilt'
+    (tmp_path / convert.READY_FILE).write_text(json.dumps({'graph_sha256': current,
+                                                           'convert': convert.CONVERT_VERSION}))
     assert convert.is_ready(tmp_path)
 
 

@@ -12,8 +12,13 @@ gives it, in the form the layout asks for:
 - `copy`: as is (biases, norms, convolutions; the decoder and joint, which
   numpy runs in float32);
 - `transpose`: a matrix stored transposed, as the graph's MatMul takes it;
-- `qweight`, `qscale`, `qzero`: the transposed matrix quantized to int8 for
-  ONNX Runtime's MatMulInteger, symmetric, one scale per output channel.
+- `qweight`, `qscale`, `qzero`: the transposed matrix quantized for ONNX
+  Runtime's MatMulInteger, symmetric, one scale per output channel, in 7 bits
+  (-63..63) of the int8. On x86 CPUs without VNNI, the u8 x s8 kernel adds
+  pairs of products in 16 bits, which saturate when full-range weights meet
+  large activations; the encoder then emits nothing. With 7-bit weights no
+  pair can saturate (2 x 255 x 63 < 32767). This is the quantizer's
+  reduce_range; on the LibriSpeech sample it costs nothing measurable.
 
 The result is a folder holding weights.bin, a copy of encoder.onnx (ONNX
 Runtime looks for external data next to the graph) and `ready.json`, written
@@ -38,6 +43,10 @@ GRAPH_DIR = Path(__file__).resolve().parent / 'graph'
 WEIGHTS_FILE = 'weights.bin'
 GRAPH_FILE = 'encoder.onnx'
 READY_FILE = 'ready.json'
+# Bumped whenever the same graph gets different weights, so folders built by
+# an older add-on are rebuilt. 2: 7-bit weights.
+CONVERT_VERSION = 2
+_QMAX = 63
 
 
 class ConvertError(Exception):
@@ -58,7 +67,7 @@ def is_ready(folder: Path) -> bool:
         stamp = json.loads((Path(folder) / READY_FILE).read_text(encoding='utf-8'))
     except (OSError, ValueError):
         return False
-    return stamp.get('graph_sha256') == layout()['graph_sha256']
+    return stamp.get('graph_sha256') == layout()['graph_sha256'] and stamp.get('convert') == CONVERT_VERSION
 
 
 def _matrix(array: np.ndarray) -> np.ndarray:
@@ -68,9 +77,9 @@ def _matrix(array: np.ndarray) -> np.ndarray:
 
 def _quantize(array: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     matrix = _matrix(array)
-    scale = np.abs(matrix).max(axis=0) / 127.0
+    scale = np.abs(matrix).max(axis=0) / _QMAX
     scale[scale == 0] = 1.0
-    quantized = np.clip(np.rint(matrix / scale), -127, 127).astype(np.int8)
+    quantized = np.clip(np.rint(matrix / scale), -_QMAX, _QMAX).astype(np.int8)
     return quantized, scale.astype(np.float32)
 
 
@@ -126,8 +135,8 @@ def build(model_path: Path, folder: Path, progress: Callable[[int, int], None],
     if absent:
         raise ConvertError(f'{Path(model_path).name} lacks {len(absent)} tensors, such as {absent[0]}')
     shutil.copyfile(GRAPH_DIR / GRAPH_FILE, partial / GRAPH_FILE)
-    (partial / READY_FILE).write_text(json.dumps({'graph_sha256': spec['graph_sha256']}) + '\n',
-                                      encoding='utf-8')
+    (partial / READY_FILE).write_text(json.dumps({'graph_sha256': spec['graph_sha256'],
+                                                  'convert': CONVERT_VERSION}) + '\n', encoding='utf-8')
     if folder.exists():
         shutil.rmtree(folder)
     os.replace(partial, folder)

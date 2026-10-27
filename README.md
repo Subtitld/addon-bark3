@@ -32,7 +32,7 @@ Once prepared, every model takes about 650 MB of disk and runs at the same
 speed: around 3% to 10% of the audio's length on a desktop CPU, with about
 1.2 GB of memory. The downloaded file is deleted after preparation.
 
-Word error rates measured with this add-on (int8 encoder) on a small
+Word error rates measured with this add-on (8-bit encoder) on a small
 LibriSpeech sample of 73 clips, 8 minutes; the differences between models
 are within its noise:
 
@@ -53,7 +53,8 @@ The archive carries the encoder's ONNX graph **without weights**
 (`bark3_addon/graph/`, made by `tools/build_graph.py`) and the layout of the
 file its weights are read from. On first use, `bark3_addon/unpack.py` decodes
 each tensor, exactly, and `bark3_addon/convert.py` writes it into
-`weights.bin` where the layout says: the encoder's matrices as int8, one scale
+`weights.bin` where the layout says: the encoder's matrices as 7-bit integers
+(in int8, so the u8 × s8 kernel of CPUs without VNNI cannot saturate), one scale
 per output channel, everything else as float32.
 
 ### Where models are stored
