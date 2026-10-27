@@ -34,8 +34,11 @@ class Addon:
     def __init__(self, tmp_path: Path, timeout: float, **options: str):
         env = dict(os.environ, SUBTITLD_TEMP_DIR=str(tmp_path), **options)
         env.setdefault('SUBTITLD_MODELS_DIR', str(tmp_path / 'models'))
+        env.setdefault('BARK3_ADDON_LOG_LEVEL', 'DEBUG')
+        self.log_path = tmp_path / 'addon.log'
+        self.log = open(self.log_path, 'wb')
         self.proc = subprocess.Popen([BINARY], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                     stderr=subprocess.DEVNULL, env=env)
+                                     stderr=self.log, env=env)
         self.timer = threading.Timer(timeout, self.proc.kill)
         self.timer.start()
 
@@ -43,9 +46,15 @@ class Addon:
         self.proc.stdin.write((json.dumps(frame) + '\n').encode())
         self.proc.stdin.flush()
 
+    def log_tail(self, lines: int = 60) -> str:
+        """The end of the add-on's stderr, for a failure message."""
+        self.log.flush()
+        text = self.log_path.read_text(encoding='utf-8', errors='replace')
+        return '\n'.join(text.splitlines()[-lines:])
+
     def read(self) -> dict:
         line = self.proc.stdout.readline()
-        assert line, 'the add-on closed its output (crashed or timed out)'
+        assert line, 'the add-on closed its output (crashed or timed out):\n' + self.log_tail()
         return json.loads(line)
 
     def until_terminal(self, req_id: str, on_progress=None) -> dict:
@@ -68,6 +77,7 @@ class Addon:
         finally:
             self.timer.cancel()
             self.proc.kill()
+            self.log.close()
 
 
 def _long_wav(path: Path, repeats: int) -> None:
@@ -106,9 +116,10 @@ def test_downloads_converts_transcribes_then_cancels(tmp_path):
         addon.send({'id': 'a', 'type': 'asr.transcribe',
                     'params': {'audio_path': str(SAMPLE), 'language': 'en-US'}})
         result = addon.until_terminal('a', lambda f: messages.append(f['message']))
-        assert result['type'] == 'result', result
+        assert result['type'] == 'result', f'{result}\n{addon.log_tail()}'
         text = ' '.join(row['text'] for row in result['data']['segments'])
-        assert 'ask not what your country can do for you' in text.lower()
+        assert 'ask not what your country can do for you' in text.lower(), \
+            f'{result}\n{addon.log_tail()}'
         assert any(m.startswith('Downloading Bark 3.0') for m in messages)
         assert any(m.startswith('Preparing Bark 3.0') for m in messages)
 

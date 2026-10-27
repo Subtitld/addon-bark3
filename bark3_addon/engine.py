@@ -11,6 +11,7 @@ the whole window, so memory grows with the square of its length.
 
 from __future__ import annotations
 
+import logging
 import threading
 from pathlib import Path
 
@@ -18,6 +19,8 @@ import numpy as np
 
 from bark3_addon import convert, frontend, tokens
 from bark3_addon.decoder import Decoder
+
+log = logging.getLogger('bark3_addon.engine')
 
 
 class Engine:
@@ -51,6 +54,10 @@ class Engine:
             encoded = self._session.run(None, {'features': features})[0][0]
             found = self._decoder.decode(encoded, cancel)
         result = tokens.words(found, self._pieces, offset_sec - self._pad_sec)
+        log.debug('window at %.1fs: %d samples, features %s (|max| %.2f), encoded %s (|max| %.2f), '
+                  '%d tokens, %d words', offset_sec, len(wave), features.shape,
+                  float(np.abs(features).max()), encoded.shape, float(np.abs(encoded).max()),
+                  len(found), len(result))
         for word in result:
             word['start'] = max(offset_sec, word['start'])
             word['end'] = max(word['start'], word['end'])
