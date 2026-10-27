@@ -106,6 +106,13 @@
         "max": 64,
         "step": 1,
         "help": "0 picks half the logical processors, at most 8."
+      },
+      {
+        "key": "slice_by_phrases",
+        "type": "bool",
+        "label": "One cue per sentence",
+        "default": true,
+        "help": "On: one subtitle per sentence, however long. Off: a long sentence is split into subtitles of about two lines or 7 seconds at most."
       }
     ]
   }

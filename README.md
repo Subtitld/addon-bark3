@@ -6,7 +6,8 @@ models, fine-tunes of NVIDIA's
 [parakeet-tdt-0.6b-v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3).
 
 - Serves the `asr.transcribe` task over Subtitld's add-on protocol, with word
-  times, regrouped into one subtitle row per sentence.
+  times, regrouped into one subtitle row per sentence (or, with
+  *One cue per sentence* off, rows of about two lines or 7 seconds at most).
 - **English only.** Punctuation, capitals and numerals come out as written text.
 - **CPU only, no torch, no cloud account.** ONNX Runtime runs the encoder;
   numpy runs the rest.
@@ -79,6 +80,7 @@ Set these in **Settings ▸ Add-ons ▸ Bark 3.0 ▸ Configure**.
 |--------|---------|---------|-------|
 | Model | `bark3` | `BARK3_MODEL` | See the table above. |
 | CPU threads | `0` | `BARK3_THREADS` | `0` = half the logical processors, at most 8. |
+| One cue per sentence | on | `BARK3_SLICE_BY_PHRASES` | On: one subtitle per sentence, however long (a sentence with no end closes at 500 characters or 30 s). Off: long sentences split at 84 characters or 7 s. |
 
 Each request takes its option from the request's own `options`, then the
 environment variable (Subtitld sets it from the Configure dialog), then the

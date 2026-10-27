@@ -214,3 +214,37 @@ def test_rows_close_at_sentence_ends():
              {'word': 'one', 'start': 0.9, 'end': 1.2}]
     rows = words_to_segments(words, 2.0)
     assert [r['text'] for r in rows] == ['Hello.', 'Next one']
+
+
+def _long_sentence(count: int) -> list[dict]:
+    words = [{'word': 'word', 'start': i * 0.3, 'end': i * 0.3 + 0.25} for i in range(count)]
+    words[-1]['word'] = 'end.'
+    return words
+
+
+def test_one_row_per_sentence_by_default():
+    words = _long_sentence(30) + [{'word': 'Next.', 'start': 9.5, 'end': 9.9}]
+    assert [len(r['text'].split()) for r in words_to_segments(words, 10.0)] == [30, 1]
+
+
+def test_off_splits_long_sentences_at_the_readability_caps():
+    rows = words_to_segments(_long_sentence(30), 10.0, by_sentence=False)
+    assert len(rows) > 1
+    assert all(len(r['text']) <= 84 and r['end'] - r['start'] <= 7.0 for r in rows)
+
+
+def test_a_sentence_that_never_ends_still_closes():
+    words = [{'word': 'word', 'start': i * 0.3, 'end': i * 0.3 + 0.25} for i in range(200)]
+    rows = words_to_segments(words, 60.0)
+    assert len(rows) > 1 and all(r['end'] - r['start'] <= 30.0 for r in rows)
+
+
+def test_slice_by_phrases_reads_the_request_then_the_environment(monkeypatch):
+    from bark3_addon.__main__ import _resolve_bool
+    monkeypatch.delenv('BARK3_SLICE_BY_PHRASES', raising=False)
+    assert _resolve_bool({}, 'slice_by_phrases', 'BARK3_SLICE_BY_PHRASES', True) is True
+    monkeypatch.setenv('BARK3_SLICE_BY_PHRASES', '0')  # how Subtitld passes an unticked box
+    assert _resolve_bool({}, 'slice_by_phrases', 'BARK3_SLICE_BY_PHRASES', True) is False
+    assert _resolve_bool({'slice_by_phrases': True}, 'slice_by_phrases', 'BARK3_SLICE_BY_PHRASES', True) is True
+    monkeypatch.setenv('BARK3_SLICE_BY_PHRASES', '1')
+    assert _resolve_bool({'slice_by_phrases': False}, 'slice_by_phrases', 'BARK3_SLICE_BY_PHRASES', True) is False

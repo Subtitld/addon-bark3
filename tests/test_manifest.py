@@ -33,8 +33,9 @@ def test_manifest_lists_what_the_code_offers():
     assert MANIFEST['tasks'] == ['asr.transcribe']
     assert MANIFEST['compute'] == 'cpu'
     fields = {f['key']: f for f in MANIFEST['config_schema']['fields']}
-    assert set(fields) == {'model', 'threads'}
+    assert set(fields) == {'model', 'threads', 'slice_by_phrases'}
     assert fields['model']['default'] == models.DEFAULT
+    assert fields['slice_by_phrases']['type'] == 'bool' and fields['slice_by_phrases']['default'] is True
     assert [o['value'] for o in fields['model']['options']] == [m['id'] for m in MANIFEST['models']] \
         == list(models.MODELS)
     assert [m['id'] for m in MANIFEST['models'] if m['default']] == [models.DEFAULT]

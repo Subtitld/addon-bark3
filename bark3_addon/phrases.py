@@ -5,8 +5,10 @@ SPDX-License-Identifier: Apache-2.0
 
 The rules are the whisper.cpp add-on's phrase regrouping, applied to words
 rather than raw segments. Bark reports word times directly, so there is no
-segment to split first. A row closes at sentence-final punctuation, and early
-when it would pass the readability caps.
+segment to split first. A row closes at sentence-final punctuation. By
+default that is all, as AssemblyAI's "one cue per sentence"; with
+`by_sentence=False` a row also closes early when it would pass the
+readability caps.
 """
 
 from __future__ import annotations
@@ -20,6 +22,12 @@ TRAILING_CLOSERS = frozenset('"\')]}»›”’')
 # Captioning readability caps: about two lines of 42 characters, or 7 seconds.
 MAX_CHARS = 84
 MAX_DURATION_SEC = 7.0
+
+# One row per sentence still closes a sentence that never ends, as speech with
+# no punctuation would otherwise become a single row. The AssemblyAI add-on's
+# caps: far above any real sentence.
+SENTENCE_MAX_CHARS = 500
+SENTENCE_MAX_DURATION_SEC = 30.0
 
 
 def ends_with_terminator(text: str) -> bool:
@@ -38,12 +46,16 @@ def ends_with_terminator(text: str) -> bool:
     return bool(t) and t[-1] in PHRASE_TERMINATORS
 
 
-def words_to_segments(words: Iterable[dict], duration_sec: float, text: str = '') -> list[dict]:
+def words_to_segments(words: Iterable[dict], duration_sec: float, text: str = '',
+                      by_sentence: bool = True) -> list[dict]:
     """Group word timings into rows of {start, end, text, speaker}.
 
-    With no word timings but some text, the whole text becomes one row over the
+    `by_sentence` gives one row per sentence; False also splits a long sentence
+    at the readability caps. With no word timings but some text, the whole text becomes one row over the
     full duration. Rows keep the order of the words.
     """
+    max_chars, max_sec = ((SENTENCE_MAX_CHARS, SENTENCE_MAX_DURATION_SEC) if by_sentence
+                          else (MAX_CHARS, MAX_DURATION_SEC))
     rows: list[dict] = []
     current: dict | None = None
     for word in words:
@@ -54,8 +66,8 @@ def words_to_segments(words: Iterable[dict], duration_sec: float, text: str = ''
         end = float(word.get('end') or start)
         if current is not None and (
                 ends_with_terminator(current['text'])
-                or len(current['text']) + 1 + len(token) > MAX_CHARS
-                or end - current['start'] > MAX_DURATION_SEC):
+                or len(current['text']) + 1 + len(token) > max_chars
+                or end - current['start'] > max_sec):
             rows.append(current)
             current = None
         if current is None:

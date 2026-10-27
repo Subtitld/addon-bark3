@@ -30,6 +30,8 @@ Options
 `model` ($BARK3_MODEL): bark3 (default), bark3-plus, bark3-clean or bark3-pro.
 `threads` ($BARK3_THREADS): ONNX Runtime threads; 0 picks half the logical
 processors, at most 8.
+`slice_by_phrases` ($BARK3_SLICE_BY_PHRASES): one subtitle per sentence (the
+default); off also splits long sentences at about two lines or 7 seconds.
 
 Limits
 ------
@@ -192,6 +194,16 @@ def _resolve_threads(options: dict) -> int:
     if threads <= 0:
         threads = max(1, min(8, (os.cpu_count() or 2) // 2))
     return min(threads, 256)
+
+
+def _resolve_bool(options: dict, key: str, env_name: str, default: bool) -> bool:
+    """The request's option, else the environment ('0', 'false', 'no', 'off' are False), else `default`."""
+    if options.get(key) is not None:
+        return bool(options[key])
+    raw = _env(env_name)
+    if raw:
+        return raw.lower() not in ('0', 'false', 'no', 'off')
+    return default
 
 
 def _resolve_language(raw) -> str:
@@ -421,6 +433,7 @@ def _handle_transcribe(state: _Request, params: dict) -> None:
         _emit_error(req_id, exc.code, exc.message)
         return
     threads = _resolve_threads(options)
+    by_sentence = _resolve_bool(options, 'slice_by_phrases', 'BARK3_SLICE_BY_PHRASES', True)
     ffmpeg = _find_ffmpeg()
     if not ffmpeg:
         _emit_error(req_id, ERR_BAD_PARAMS,
@@ -429,7 +442,7 @@ def _handle_transcribe(state: _Request, params: dict) -> None:
 
     outcome: tuple = ('error', ERR_INTERNAL, 'no outcome', False)
     try:
-        log.info('transcribe %s: model=%s threads=%d', req_id, model, threads)
+        log.info('transcribe %s: model=%s threads=%d by_sentence=%s', req_id, model, threads, by_sentence)
         if state.cancel.is_set():
             raise _Cancelled()
 
@@ -462,7 +475,7 @@ def _handle_transcribe(state: _Request, params: dict) -> None:
                 _emit_progress(req_id, 0.45 + 0.55 * end / len(samples), 'Transcribing...')
             log.info('transcribe %s: %.1fs of audio in %d windows, %.2fs', req_id, duration,
                      len(ranges), time.monotonic() - started)
-            segments = words_to_segments(words, duration)
+            segments = words_to_segments(words, duration, by_sentence=by_sentence)
         if state.cancel.is_set():
             raise _Cancelled()
         outcome = ('result', {
