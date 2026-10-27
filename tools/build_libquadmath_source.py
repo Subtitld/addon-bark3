@@ -23,7 +23,7 @@ From each source package the tarball keeps libquadmath/, the top-level build
 machinery its configure and Makefile use, and the distribution's spec and patches
 (a few MB), not the rest of the compiler. Each package stays linked in the README.
 
-    python tools/build_libquadmath_source.py --out bark3-26.10.1-libquadmath-source.tar.gz
+    python tools/build_libquadmath_source.py --out bark3-26.10.2-libquadmath-source.tar.gz
     python tools/build_libquadmath_source.py --check-bundle dist/bark3-addon
 
 `--check-bundle` fails when a bundled libquadmath is not one of these builds (a

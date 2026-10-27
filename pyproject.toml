@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "subtitld-addon-bark3"
-version = "26.10.1"
+version = "26.10.2"
 description = "Subtitld add-on: offline English speech-to-text with Bark 3.0"
 readme = "README.md"
 license = { text = "Apache-2.0" }

@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "id": "bark3",
-  "version": "26.10.1",
+  "version": "26.10.2",
   "display_name": "Bark 3.0 (offline, English)",
   "summary": "Conway Research's Bark 3.0, a fine-tune of NVIDIA's Parakeet: accurate English speech-to-text with word timestamps, on the CPU at about 30 times real time. Bark 3.0 (163 MB) downloads on first use; Plus, Clean (no \"um\"s or false starts) and Pro download only if you pick them.",
   "author": "Subtitld",
