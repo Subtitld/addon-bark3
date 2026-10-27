@@ -1,0 +1,37 @@
+{
+ "bark3": {
+  "repo": "ConwayResearch/Underdog-Bark-3.0",
+  "revision": "85db2ad18ab41e534a222ee253c29191d77ed919",
+  "path": "model.bark",
+  "size": 163398645,
+  "sha256": "c18de9418d73cbeb80b8c1287b392d480a56e191ef4a81d1baaa1b02e66d92ed"
+ },
+ "bark3-plus": {
+  "repo": "ConwayResearch/Underdog-Bark-3.0-Plus",
+  "revision": "d4fab2f8b95681e5ad3cfb4e8c5f4e0c009b3deb",
+  "path": "model.bark",
+  "size": 179524845,
+  "sha256": "fdd9f1052e4fdead07d71e8cd2138813eb0c209fd6ff8b1b6f47737e1e501857"
+ },
+ "bark3-clean": {
+  "repo": "ConwayResearch/Underdog-Bark-3.0-Clean",
+  "revision": "6d34ed8639b2b9a33e764acf06748519bbb950cf",
+  "path": "model.bark",
+  "size": 179458613,
+  "sha256": "b67ca90d94b79a36af4616f1cb3f241884925de7aa9f3e673a8d5c6c4cfd3436"
+ },
+ "bark3-pro": {
+  "repo": "ConwayResearch/Underdog-Bark-3.0-Pro",
+  "revision": "4b5c51e04aa8d16dda9ecdff71bc29f7360149e4",
+  "path": "model.safetensors",
+  "size": 1254196636,
+  "sha256": "6f84b33e63ebd1851e910e8b2fe299d29f5e0efc6f57e84d92d2f79af464e0e5"
+ },
+ "tokenizer": {
+  "repo": "nvidia/parakeet-tdt-0.6b-v3",
+  "revision": "541d1f99c6b0c3cd0b11a95167540bb8edefd82b",
+  "path": "tokenizer.json",
+  "size": 1159960,
+  "sha256": "bd321b096832a3f270bd3b2a88823957920f1a5c5ada71114a26ea729d0cbe91"
+ }
+}

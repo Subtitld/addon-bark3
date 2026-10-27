@@ -1,0 +1,12 @@
+# Exact versions the release is built and tested with.
+#
+# numpy: its Linux wheel carries libquadmath (LGPL-2.1, with OpenBLAS's
+# Fortran runtime). tools/build_libquadmath_source.py knows this wheel's build
+# and attaches its source to the release; a numpy upgrade that changes it
+# must update BUILDS there.
+onnxruntime==1.31.0
+constriction==0.5.0
+numpy==2.5.4
+flatbuffers==25.12.19
+protobuf==7.36.2
+packaging==26.3

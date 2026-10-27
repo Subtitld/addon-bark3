@@ -1,0 +1,23 @@
+Bark 3.0 add-on for Subtitld
+Copyright 2026 Subtitld contributors
+Licensed under the Apache License, Version 2.0 (LICENSE).
+
+The models this add-on downloads and runs are not part of it:
+
+  Underdog Bark 3.0, Bark 3.0 Plus, Bark 3.0 Clean and Bark 3.0 Pro
+  (c) Conway Research, CC-BY-4.0
+    https://huggingface.co/ConwayResearch/Underdog-Bark-3.0
+  derived from
+    nvidia/parakeet-tdt-0.6b-v3, (c) NVIDIA Corporation, CC-BY-4.0
+      https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
+    moondream/parakeet-ultra, (c) Moondream, CC-BY-4.0
+      https://huggingface.co/moondream/parakeet-ultra
+  License: https://creativecommons.org/licenses/by/4.0/
+
+  The tokenizer (tokenizer.json) is nvidia/parakeet-tdt-0.6b-v3's, CC-BY-4.0.
+
+Changes made by this add-on, on the user's computer: the downloaded weights
+are decoded and the encoder's matrices are quantized to 8-bit integers, one
+scale per output channel, for ONNX Runtime. The encoder graph in
+bark3_addon/graph/ was exported from transformers' ParakeetForTDT
+(Apache-2.0) and holds no weights.

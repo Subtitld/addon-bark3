@@ -1,0 +1,112 @@
+{
+  "manifest_version": 1,
+  "id": "bark3",
+  "version": "26.10.1",
+  "display_name": "Bark 3.0 (offline, English)",
+  "summary": "Conway Research's Bark 3.0, a fine-tune of NVIDIA's Parakeet: accurate English speech-to-text with word timestamps, on the CPU at about 30 times real time. Bark 3.0 (163 MB) downloads on first use; Plus, Clean (no \"um\"s or false starts) and Pro download only if you pick them.",
+  "author": "Subtitld",
+  "homepage": "https://github.com/Subtitld/addon-bark3",
+  "license": "Apache-2.0 (add-on); CC-BY-4.0 (Bark 3.0 models by Conway Research, derived from NVIDIA parakeet-tdt-0.6b-v3)",
+  "executable": "bin/bark3-addon",
+  "protocol": 1,
+  "startup_timeout_sec": 30,
+  "platforms": [
+    "linux",
+    "macos",
+    "windows"
+  ],
+  "tasks": [
+    "asr.transcribe"
+  ],
+  "compute": "cpu",
+  "languages": [
+    "en"
+  ],
+  "models": [
+    {
+      "id": "bark3",
+      "display_name": "Bark 3.0 (0.6B, verbatim)",
+      "repo": "ConwayResearch/Underdog-Bark-3.0",
+      "revision": "85db2ad18ab41e534a222ee253c29191d77ed919",
+      "size_mb": 163,
+      "license": "CC-BY-4.0",
+      "bundled": false,
+      "default": true,
+      "english_only": true
+    },
+    {
+      "id": "bark3-plus",
+      "display_name": "Bark 3.0 Plus (0.6B, verbatim, more accurate)",
+      "repo": "ConwayResearch/Underdog-Bark-3.0-Plus",
+      "revision": "d4fab2f8b95681e5ad3cfb4e8c5f4e0c009b3deb",
+      "size_mb": 180,
+      "license": "CC-BY-4.0",
+      "bundled": false,
+      "default": false,
+      "english_only": true
+    },
+    {
+      "id": "bark3-clean",
+      "display_name": "Bark 3.0 Clean (0.6B, drops fillers and false starts)",
+      "repo": "ConwayResearch/Underdog-Bark-3.0-Clean",
+      "revision": "6d34ed8639b2b9a33e764acf06748519bbb950cf",
+      "size_mb": 179,
+      "license": "CC-BY-4.0",
+      "bundled": false,
+      "default": false,
+      "english_only": true
+    },
+    {
+      "id": "bark3-pro",
+      "display_name": "Bark 3.0 Pro (0.6B, full precision)",
+      "repo": "ConwayResearch/Underdog-Bark-3.0-Pro",
+      "revision": "4b5c51e04aa8d16dda9ecdff71bc29f7360149e4",
+      "size_mb": 1254,
+      "license": "CC-BY-4.0",
+      "bundled": false,
+      "default": false,
+      "english_only": true
+    }
+  ],
+  "disk_required_mb": 900,
+  "ram_required_mb": 1536,
+  "config_schema": {
+    "fields": [
+      {
+        "key": "model",
+        "type": "select",
+        "label": "Model",
+        "default": "bark3",
+        "options": [
+          {
+            "value": "bark3",
+            "label": "Bark 3.0: 163 MB download, the default"
+          },
+          {
+            "value": "bark3-plus",
+            "label": "Bark 3.0 Plus: 180 MB, a little more accurate"
+          },
+          {
+            "value": "bark3-clean",
+            "label": "Bark 3.0 Clean: 179 MB, leaves out fillers (um, uh) and false starts"
+          },
+          {
+            "value": "bark3-pro",
+            "label": "Bark 3.0 Pro: 1.25 GB, the most accurate"
+          }
+        ],
+        "help": "Each model downloads once, the first time you use it, and is then prepared for this computer (about half a minute). Prepared, each takes about 650 MB of disk; all run at the same speed."
+      },
+      {
+        "key": "threads",
+        "type": "int",
+        "label": "CPU threads",
+        "default": 0,
+        "min": 0,
+        "max": 64,
+        "step": 1,
+        "help": "0 picks half the logical processors, at most 8."
+      }
+    ]
+  }
+}

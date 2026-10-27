@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "subtitld-addon-bark3"
+version = "26.10.1"
+description = "Subtitld add-on: offline English speech-to-text with Bark 3.0"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Subtitld", email = "jbopen@gmail.com" }]
+requires-python = ">=3.10"
+
+# ONNX Runtime runs the encoder's graph; the features, the decoder and the
+# joint are the add-on's own (numpy); constriction decodes the entropy-coded
+# .bark weights. The downloads use the standard library. Pinned: the graph and
+# the unpacking were checked with them.
+dependencies = [
+    "onnxruntime==1.31.0",
+    "constriction==0.5.0",
+    "numpy>=1.26,<3",  # constraints.txt pins the release build
+]
+
+[project.optional-dependencies]
+build = ["pyinstaller>=6.10"]
+dev = ["pytest>=7.4"]
+
+[project.scripts]
+bark3-addon = "bark3_addon.__main__:main"
+
+[tool.setuptools]
+packages = ["bark3_addon"]
+
+[tool.setuptools.package-data]
+bark3_addon = ["pins.json", "graph/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["model: needs Bark 3.0 (downloads 163 MB and converts it on the first run)"]
