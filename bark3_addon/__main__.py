@@ -54,6 +54,7 @@ import json  # noqa: E402
 import logging  # noqa: E402
 import platform  # noqa: E402
 import shutil  # noqa: E402
+import signal  # noqa: E402
 import subprocess  # noqa: E402
 import sys  # noqa: E402
 import tempfile  # noqa: E402
@@ -258,21 +259,65 @@ def _child_env() -> dict | None:
     return env
 
 
+# Haiku's fork() fails with "Out of memory" once the model has run (it
+# reserves room to copy what it wrote), and its posix_spawn forks too as soon
+# as it has file actions to carry out. So on Haiku a shell is spawned with
+# none, sets up ffmpeg's files itself and becomes ffmpeg, which writes its
+# samples to a temporary file instead of a pipe.
+HAIKU = sys.platform.startswith('haiku')
+_HAIKU_SCRIPT = 'err=$1; shift; exec "$@" </dev/null >/dev/null 2>"$err"'
+
+
+def _run_ffmpeg_haiku(cmd: list[str], err: str, cancel: threading.Event) -> int:
+    """Run ffmpeg to the end (Haiku), its messages in `err`; its exit code."""
+    pid = os.posix_spawn('/bin/sh', ['sh', '-c', _HAIKU_SCRIPT, 'sh', err, *cmd], os.environ)
+    try:
+        while True:
+            done, status = os.waitpid(pid, os.WNOHANG)
+            if done:
+                return os.waitstatus_to_exitcode(status)
+            if cancel.is_set():
+                raise _Cancelled()
+            time.sleep(0.1)
+    except BaseException:
+        os.kill(pid, signal.SIGKILL)
+        os.waitpid(pid, 0)
+        raise
+
+
+def _decode_failed(returncode: int, errors: bytes) -> _AddonError:
+    tail = ' / '.join(errors.decode('utf-8', 'replace').strip().splitlines()[-5:])
+    if 'No space left' in tail:
+        return _AddonError(ERR_DISK_FULL, f'Out of disk space while decoding the audio: {tail}')
+    return _AddonError(ERR_INTERNAL,
+                       f'Could not decode the audio with ffmpeg '
+                       f'(exit {returncode}): {tail or "no output"}')
+
+
 def _decode(ffmpeg: str, src: str, cancel: threading.Event) -> np.ndarray:
     """Decode anything ffmpeg reads into 16 kHz mono float samples in [-1, 1].
 
     ffmpeg writes float32 straight into a pipe, so no temporary audio file is
-    made and no PCM copy is kept: the samples are read in chunks into one
-    buffer. stderr goes to a temporary file, so a chatty ffmpeg cannot
-    fill a pipe and stall. `-nostdin` plus stdin=DEVNULL: ffmpeg polls stdin
-    for keystrokes.
+    made (but on Haiku, above) and no PCM copy is kept: the samples are read
+    in chunks into one buffer. stderr goes to a temporary file, so a chatty
+    ffmpeg cannot fill a pipe and stall. `-nostdin` plus stdin=DEVNULL: ffmpeg
+    polls stdin for keystrokes.
     """
     cmd = [ffmpeg, '-nostdin', '-hide_banner', '-loglevel', 'error',
            '-i', src, '-vn', '-sn', '-dn',
-           '-ac', '1', '-ar', str(SAMPLE_RATE), '-c:a', 'pcm_f32le', '-f', 'f32le', 'pipe:1']
+           '-ac', '1', '-ar', str(SAMPLE_RATE), '-c:a', 'pcm_f32le', '-f', 'f32le']
+    if HAIKU:
+        with tempfile.TemporaryDirectory() as folder:
+            out, err = os.path.join(folder, 'audio.f32'), os.path.join(folder, 'errors.txt')
+            returncode = _run_ffmpeg_haiku([shutil.which(ffmpeg) or ffmpeg, *cmd[1:], out], err, cancel)
+            data = Path(out).read_bytes() if os.path.exists(out) else b''
+            usable = len(data) // 4 * 4
+            if returncode != 0 or not usable:
+                raise _decode_failed(returncode, Path(err).read_bytes() if os.path.exists(err) else b'')
+        return np.frombuffer(memoryview(data)[:usable], '<f4').astype(np.float32)
     data = bytearray()
     with tempfile.TemporaryFile() as errors:
-        proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+        proc = subprocess.Popen([*cmd, 'pipe:1'], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                 stderr=errors, env=_child_env(),
                                 startupinfo=_no_window_startupinfo())
         try:
@@ -292,12 +337,7 @@ def _decode(ffmpeg: str, src: str, cancel: threading.Event) -> np.ndarray:
         usable = len(data) // 4 * 4
         if returncode != 0 or not usable:
             errors.seek(0)
-            tail = ' / '.join(errors.read().decode('utf-8', 'replace').strip().splitlines()[-5:])
-            if 'No space left' in tail:
-                raise _AddonError(ERR_DISK_FULL, f'Out of disk space while decoding the audio: {tail}')
-            raise _AddonError(ERR_INTERNAL,
-                              f'Could not decode the audio with ffmpeg '
-                              f'(exit {returncode}): {tail or "no output"}')
+            raise _decode_failed(returncode, errors.read())
     # ffmpeg wrote little-endian floats.
     return np.frombuffer(memoryview(data)[:usable], '<f4').astype(np.float32)
 

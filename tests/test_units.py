@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import json
 import lzma
+import shutil
 import sys
+import threading
+import time
 from pathlib import Path
 
 import numpy as np
@@ -248,3 +251,28 @@ def test_slice_by_phrases_reads_the_request_then_the_environment(monkeypatch):
     assert _resolve_bool({'slice_by_phrases': True}, 'slice_by_phrases', 'BARK3_SLICE_BY_PHRASES', True) is True
     monkeypatch.setenv('BARK3_SLICE_BY_PHRASES', '1')
     assert _resolve_bool({'slice_by_phrases': False}, 'slice_by_phrases', 'BARK3_SLICE_BY_PHRASES', True) is False
+
+
+# ---------------------------------------------------------------------------
+# Decoding the way Haiku does: a spawned shell, a temporary file
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(not shutil.which('ffmpeg'), reason='no ffmpeg')
+def test_the_haiku_decode_matches_the_pipe(monkeypatch):
+    from bark3_addon import __main__ as addon
+    jfk = str(REPO_ROOT / 'tests' / 'data' / 'jfk.flac')
+    piped = addon._decode('ffmpeg', jfk, threading.Event())
+    monkeypatch.setattr(addon, 'HAIKU', True)
+    assert np.array_equal(addon._decode('ffmpeg', jfk, threading.Event()), piped)
+    with pytest.raises(addon._AddonError, match='Could not decode'):
+        addon._decode('ffmpeg', str(REPO_ROOT / 'README.md'), threading.Event())
+
+
+def test_the_haiku_decode_stops_on_cancel(tmp_path):
+    from bark3_addon import __main__ as addon
+    cancel = threading.Event()
+    cancel.set()
+    started = time.monotonic()
+    with pytest.raises(addon._Cancelled):
+        addon._run_ffmpeg_haiku(['sleep', '30'], str(tmp_path / 'err'), cancel)
+    assert time.monotonic() - started < 5
