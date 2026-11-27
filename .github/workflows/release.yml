@@ -292,9 +292,70 @@ jobs:
             ${{ env.SOURCE_FILES }}
           if-no-files-found: error
 
+  build-haiku:
+    name: Build haiku-x86_64
+    needs: test
+    runs-on: ubuntu-22.04
+    # Not frozen: on Haiku the add-on runs on HaikuPorts' Python, with numpy,
+    # ONNX Runtime and constriction from the Haiku packages manifest.json lists
+    # (onnxruntime_python3.14 and constriction_python3.14 are on
+    # hpkg.subtitld.org). The add-on itself is pure Python, so the zip builds
+    # here; see tools/build_haiku.py. Its tests run on Haiku, on the build VM,
+    # before a release.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Build the Haiku zip
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive=$(python tools/build_haiku.py)
+          echo "ARCHIVE_NAME=$(basename "$archive")" >> "$GITHUB_ENV"
+
+      - name: Assert the archive is complete
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, sys, zipfile
+          name = os.environ['ARCHIVE_NAME']
+          zf = zipfile.ZipFile(name)
+          names = set(zf.namelist())
+          manifest = json.loads(zf.read('manifest.json'))
+          problems = []
+          if manifest != json.load(open('manifest.json', encoding='utf-8')):
+              problems.append('manifest differs from the repo')
+          if not zf.getinfo(manifest['executable']).external_attr >> 16 & 0o111:
+              problems.append('launcher is not executable')
+          required = ['manifest.json', 'LICENSE', 'README.md', manifest['executable'], 'bin/boot.py',
+                      'bin/app/bark3_addon/__main__.py', 'bin/app/bark3_addon/pins.json', 'bin/app/bark3_addon/graph/encoder.onnx', 'bin/app/bark3_addon/graph/layout.json']
+          problems += [f'missing {r}' for r in required if r not in names and not any(n.startswith(r + '/') for n in names)]
+          if problems:
+              sys.exit('FATAL: ' + '; '.join(problems))
+          print(f'{name}: {len(names)} entries, all required files present')
+          PY
+
+      - name: Checksum
+        shell: bash
+        run: |
+          python -c "import hashlib,os;p=os.environ['ARCHIVE_NAME'];print(hashlib.sha256(open(p,'rb').read()).hexdigest())" > "${ARCHIVE_NAME}.sha256"
+          cat "${ARCHIVE_NAME}.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: haiku-x86_64
+          path: |
+            ${{ env.ARCHIVE_NAME }}
+            ${{ env.ARCHIVE_NAME }}.sha256
+          if-no-files-found: error
+
   release:
     name: Publish GitHub Release
-    needs: build
+    needs: [build, build-haiku]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-22.04
     steps:
@@ -316,7 +377,7 @@ jobs:
           ls -lah release-files
           # Every advertised platform must be present, each with its sidecar,
           # or the catalog refuses the release.
-          for label in linux-x86_64 macos-arm64 windows-x86_64; do
+          for label in linux-x86_64 macos-arm64 windows-x86_64 haiku-x86_64; do
             test -f "release-files/bark3-${version}-${label}.zip"
             test -f "release-files/bark3-${version}-${label}.zip.sha256"
           done
@@ -330,6 +391,10 @@ jobs:
           body: |
             Offline English speech-to-text for Subtitld with Conway Research's Bark 3.0, a
             fine-tune of NVIDIA's parakeet-tdt-0.6b-v3, with word times. On the CPU, no torch.
+
+            The Haiku archive holds the add-on only: it runs on HaikuPorts' Python 3.14, with
+            numpy from HaikuPorts and ONNX Runtime and constriction from hpkg.subtitld.org,
+            which Subtitld offers to install.
 
             The archive holds the add-on, ONNX Runtime and the encoder's graph without
             weights. The chosen model (Bark 3.0 163 MB by default; Plus 180 MB, Clean 179 MB,
