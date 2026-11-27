@@ -8,6 +8,6 @@ The package exists so the entry point can run both from source
 (`bin/bark3-addon`).
 """
 
-__version__ = '26.10.2'
+__version__ = '26.11.1'
 ADDON_ID = 'bark3'
 PROTOCOL_VERSION = 1
